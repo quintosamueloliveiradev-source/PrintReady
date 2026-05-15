@@ -1,5 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { cn } from '../lib/utils';
+
+export interface CanvasPreviewRef {
+  getPrintDataURL: () => string;
+}
 
 interface CanvasPreviewProps {
   image: HTMLImageElement | null;
@@ -8,23 +12,39 @@ interface CanvasPreviewProps {
   layoutMode: 1 | 2 | 4;
   orientation: 'portrait' | 'landscape';
   showCutMarks: boolean;
-  onCanvasReady: (canvas: HTMLCanvasElement) => void;
+  showTrimLine: boolean;
+  showSafeMargin: boolean;
+  showBleedMargin: boolean;
 }
 
-export default function CanvasPreview({
+export default forwardRef<CanvasPreviewRef, CanvasPreviewProps>(function CanvasPreview({
   image,
   bleedSize,
   bleedType,
   layoutMode,
   orientation,
   showCutMarks,
-  onCanvasReady
-}: CanvasPreviewProps) {
+  showTrimLine,
+  showSafeMargin,
+  showBleedMargin
+}, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dominantColor, setDominantColor] = useState('#ffffff');
 
   // Multiplier from mm to pixels at 300 DPI (for high quality export)
   const MM_TO_PX = 11.811; 
+
+  useImperativeHandle(ref, () => ({
+    getPrintDataURL: () => {
+      const offscreen = document.createElement('canvas');
+      const ctx = offscreen.getContext('2d');
+      if (ctx && image) {
+        renderCanvas(offscreen, ctx, true);
+        return offscreen.toDataURL('image/jpeg', 1.0);
+      }
+      return '';
+    }
+  }));
 
   useEffect(() => {
     if (image) {
@@ -45,11 +65,8 @@ export default function CanvasPreview({
     setDominantColor(hex);
   };
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !image) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  const renderCanvas = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, isExport: boolean) => {
+    if (!image) return;
 
     // A4 Dimensions: 210 x 297 mm
     const a4Width = orientation === 'portrait' ? 210 : 297;
@@ -75,16 +92,41 @@ export default function CanvasPreview({
       const col = i % cols;
       const row = Math.floor(i / cols);
       
-      const x = col * cellWidth + cellWidth / 2;
-      const y = row * cellHeight + cellHeight / 2;
+      let x = col * cellWidth + cellWidth / 2;
+      let y = row * cellHeight + cellHeight / 2;
 
-      // Use a higher fill factor for 4-up (A6) to fit better
-      const fillFactor = layoutMode === 4 ? 0.95 : 0.8;
-      renderArtWithBleed(ctx, x, y, image, bleedPx, cellWidth * fillFactor, cellHeight * fillFactor);
+      let finalMaxWidth = cellWidth * 0.8;
+      let finalMaxHeight = cellHeight * 0.8;
+
+      if (layoutMode === 4) {
+        // Configure sizes to make them slightly smaller to balance the gap
+        finalMaxWidth = cellWidth * 0.90;
+        finalMaxHeight = cellHeight * 0.90;
+      }
+      
+      renderArtWithBleed(ctx, x, y, image, bleedPx, finalMaxWidth, finalMaxHeight, isExport);
     }
+  };
 
-    onCanvasReady(canvas);
-  }, [image, bleedSize, bleedType, layoutMode, orientation, showCutMarks, dominantColor]);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !image) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    renderCanvas(canvas, ctx, false);
+  }, [
+    image, 
+    bleedSize, 
+    bleedType, 
+    layoutMode, 
+    orientation, 
+    showCutMarks, 
+    showTrimLine,
+    showSafeMargin,
+    showBleedMargin,
+    dominantColor
+  ]);
 
   const renderArtWithBleed = (
     ctx: CanvasRenderingContext2D, 
@@ -93,7 +135,8 @@ export default function CanvasPreview({
     img: HTMLImageElement, 
     bleedPx: number,
     maxWidth: number,
-    maxHeight: number
+    maxHeight: number,
+    isExport: boolean
   ) => {
     // Calculate scaling to fit cell
     const scale = Math.min(maxWidth / img.width, maxHeight / img.height);
@@ -132,57 +175,70 @@ export default function CanvasPreview({
       ctx.drawImage(img, bleedRect.x, bleedRect.y, bleedRect.w, bleedRect.h);
     }
 
-    // 2. Draw Original Image over bleed (the "safe" area)
+    // 2. Draw Original Image over bleed (the "trim" area)
     ctx.drawImage(img, x, y, w, h);
 
-    // 3. Draw Crop Marks (Corner marks)
+    // 3. Draw Crop Marks (Corner marks) - Exported & Previewed
     if (showCutMarks) {
-      const markLen = 5 * MM_TO_PX; // 5mm Length of crop marks
-      const offset = 2 * MM_TO_PX;   // 2mm Offset from the trim line
+      const markLen = 2 * MM_TO_PX; // 2mm Length of crop marks
+      const offset = bleedPx + (1 * MM_TO_PX); // Start 1mm outside the bleed area
       
+      // Professional lines, made thicker for better visibility
       ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1 * (MM_TO_PX / 3.78);
+      ctx.lineWidth = 1.5 * (MM_TO_PX / 3.78); // ~1.5pt width for better visibility
       ctx.setLineDash([]);
 
+      const drawMark = (startX: number, startY: number, endX: number, endY: number) => {
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+      };
+
       // Top Left
-      ctx.beginPath();
-      ctx.moveTo(x, y - offset);
-      ctx.lineTo(x, y - offset - markLen);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x - offset, y);
-      ctx.lineTo(x - offset - markLen, y);
-      ctx.stroke();
+      drawMark(x, y - offset, x, y - offset - markLen); // Top vertical
+      drawMark(x - offset, y, x - offset - markLen, y); // Left horizontal
 
       // Top Right
-      ctx.beginPath();
-      ctx.moveTo(x + w, y - offset);
-      ctx.lineTo(x + w, y - offset - markLen);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x + w + offset, y);
-      ctx.lineTo(x + w + offset + markLen, y);
-      ctx.stroke();
+      drawMark(x + w, y - offset, x + w, y - offset - markLen); // Top vertical
+      drawMark(x + w + offset, y, x + w + offset + markLen, y); // Right horizontal
 
       // Bottom Left
-      ctx.beginPath();
-      ctx.moveTo(x, y + h + offset);
-      ctx.lineTo(x, y + h + offset + markLen);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x - offset, y + h);
-      ctx.lineTo(x - offset - markLen, y + h);
-      ctx.stroke();
+      drawMark(x, y + h + offset, x, y + h + offset + markLen); // Bottom vertical
+      drawMark(x - offset, y + h, x - offset - markLen, y + h); // Left horizontal
 
       // Bottom Right
-      ctx.beginPath();
-      ctx.moveTo(x + w, y + h + offset);
-      ctx.lineTo(x + w, y + h + offset + markLen);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x + w + offset, y + h);
-      ctx.lineTo(x + w + offset + markLen, y + h);
-      ctx.stroke();
+      drawMark(x + w, y + h + offset, x + w, y + h + offset + markLen); // Bottom vertical
+      drawMark(x + w + offset, y + h, x + w + offset + markLen, y + h); // Right horizontal
+    }
+    
+    // 4. Draw Visual Guides (Preview Only)
+    if (!isExport) {
+      // Trim Line Box (Black, exact cut)
+      if (showTrimLine) {
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.lineWidth = 1.5 * (MM_TO_PX / 3.78);
+        ctx.setLineDash([10, 10]);
+        ctx.strokeRect(x, y, w, h);
+      }
+
+      // Bleed Margin Box (Red, outside trim)
+      if (showBleedMargin) {
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)'; // text-red-500
+        ctx.lineWidth = 2 * (MM_TO_PX / 3.78);
+        ctx.setLineDash([15, 10]);
+        ctx.strokeRect(bleedRect.x, bleedRect.y, bleedRect.w, bleedRect.h);
+      }
+
+      // Safe Margin Box (Blue, 3mm inside trim)
+      if (showSafeMargin) {
+        const safeMarginPx = 3 * MM_TO_PX;
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)'; // text-blue-500
+        ctx.lineWidth = 1.5 * (MM_TO_PX / 3.78);
+        ctx.setLineDash([8, 8]);
+        ctx.strokeRect(x + safeMarginPx, y + safeMarginPx, w - safeMarginPx * 2, h - safeMarginPx * 2);
+      }
+      ctx.setLineDash([]); // Reset dash
     }
 
     ctx.restore();
@@ -197,4 +253,4 @@ export default function CanvasPreview({
       />
     </div>
   );
-}
+});

@@ -34,9 +34,14 @@ export default function App() {
   const [layoutMode, setLayoutMode] = useState<1 | 2 | 4>(1);
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [showCutMarks, setShowCutMarks] = useState(true);
+  
+  // Visual Guides (Preview only)
+  const [showTrimLine, setShowTrimLine] = useState(true);
+  const [showSafeMargin, setShowSafeMargin] = useState(true);
+  const [showBleedMargin, setShowBleedMargin] = useState(true);
 
   // Canvas Reference for export
-  const activeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const activeCanvasRef = useRef<{ getPrintDataURL: () => string } | null>(null);
 
   const handleImageSelect = (selectedFile: File) => {
     setFile(selectedFile);
@@ -63,7 +68,6 @@ export default function App() {
     if (!activeCanvasRef.current) return;
     
     setIsProcessing(true);
-    const canvas = activeCanvasRef.current;
     
     // Create PDF with sheet orientation
     const pdf = new jsPDF({
@@ -73,7 +77,7 @@ export default function App() {
     });
 
     // 1.0 max quality JPEG to keep file size reasonable while preserving 300DPI quality
-    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+    const imgData = activeCanvasRef.current.getPrintDataURL();
     pdf.addImage(imgData, 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
     
     pdf.save(`PrintReady_${file?.name.split('.')[0] || 'arte'}_A4.pdf`);
@@ -183,6 +187,9 @@ export default function App() {
                 layoutMode={layoutMode} setLayoutMode={setLayoutMode}
                 orientation={orientation} setOrientation={setOrientation}
                 showCutMarks={showCutMarks} setShowCutMarks={setShowCutMarks}
+                showTrimLine={showTrimLine} setShowTrimLine={setShowTrimLine}
+                showSafeMargin={showSafeMargin} setShowSafeMargin={setShowSafeMargin}
+                showBleedMargin={showBleedMargin} setShowBleedMargin={setShowBleedMargin}
               />
               
               <div className="mt-12 pt-6 border-t border-slate-100">
@@ -215,13 +222,16 @@ export default function App() {
 
               <div className="flex-1 min-h-[500px]">
                 <CanvasPreview 
+                  ref={activeCanvasRef}
                   image={image}
                   bleedSize={bleedSize}
                   bleedType={bleedType}
                   layoutMode={layoutMode}
                   orientation={orientation}
                   showCutMarks={showCutMarks}
-                  onCanvasReady={(canvas) => activeCanvasRef.current = canvas}
+                  showTrimLine={showTrimLine}
+                  showSafeMargin={showSafeMargin}
+                  showBleedMargin={showBleedMargin}
                 />
               </div>
 

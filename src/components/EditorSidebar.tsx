@@ -21,6 +21,12 @@ interface EditorSidebarProps {
   setOrientation: (o: 'portrait' | 'landscape') => void;
   showCutMarks: boolean;
   setShowCutMarks: (v: boolean) => void;
+  showTrimLine: boolean;
+  setShowTrimLine: (v: boolean) => void;
+  showSafeMargin: boolean;
+  setShowSafeMargin: (v: boolean) => void;
+  showBleedMargin: boolean;
+  setShowBleedMargin: (v: boolean) => void;
 }
 
 export default function EditorSidebar({
@@ -28,7 +34,10 @@ export default function EditorSidebar({
   bleedType, setBleedType,
   layoutMode, setLayoutMode,
   orientation, setOrientation,
-  showCutMarks, setShowCutMarks
+  showCutMarks, setShowCutMarks,
+  showTrimLine, setShowTrimLine,
+  showSafeMargin, setShowSafeMargin,
+  showBleedMargin, setShowBleedMargin
 }: EditorSidebarProps) {
   return (
     <div className="w-full flex flex-col gap-8">
@@ -134,6 +143,63 @@ export default function EditorSidebar({
               <span className={cn(
                 "inline-block h-2 w-2 transform rounded-full bg-white transition-transform",
                 showCutMarks ? "translate-x-5" : "translate-x-1"
+              )} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded">
+            <div className="flex flex-col">
+              <span className="text-[11px] font-bold text-gray-700">Linha de Corte (Trim)</span>
+              <span className="text-[9px] text-gray-400">Linha final de corte (Preta)</span>
+            </div>
+            <button
+              onClick={() => setShowTrimLine(!showTrimLine)}
+              className={cn(
+                "relative inline-flex h-4 w-8 items-center rounded-full transition-colors",
+                showTrimLine ? "bg-brand-600" : "bg-gray-300"
+              )}
+            >
+              <span className={cn(
+                "inline-block h-2 w-2 transform rounded-full bg-white transition-transform",
+                showTrimLine ? "translate-x-5" : "translate-x-1"
+              )} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded">
+            <div className="flex flex-col">
+              <span className="text-[11px] font-bold text-gray-700">Margem de Segurança</span>
+              <span className="text-[9px] text-gray-400">Área interna segura (Azul, 3mm)</span>
+            </div>
+            <button
+              onClick={() => setShowSafeMargin(!showSafeMargin)}
+              className={cn(
+                "relative inline-flex h-4 w-8 items-center rounded-full transition-colors",
+                showSafeMargin ? "bg-brand-600" : "bg-gray-300"
+              )}
+            >
+              <span className={cn(
+                "inline-block h-2 w-2 transform rounded-full bg-white transition-transform",
+                showSafeMargin ? "translate-x-5" : "translate-x-1"
+              )} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded">
+            <div className="flex flex-col">
+              <span className="text-[11px] font-bold text-gray-700">Área de Sangria</span>
+              <span className="text-[9px] text-gray-400">Visualização da borda (Vermelha)</span>
+            </div>
+            <button
+              onClick={() => setShowBleedMargin(!showBleedMargin)}
+              className={cn(
+                "relative inline-flex h-4 w-8 items-center rounded-full transition-colors",
+                showBleedMargin ? "bg-brand-600" : "bg-gray-300"
+              )}
+            >
+              <span className={cn(
+                "inline-block h-2 w-2 transform rounded-full bg-white transition-transform",
+                showBleedMargin ? "translate-x-5" : "translate-x-1"
               )} />
             </button>
           </div>
