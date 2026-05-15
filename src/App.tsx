@@ -72,8 +72,9 @@ export default function App() {
       format: 'a4'
     });
 
-    const imgData = canvas.toDataURL('image/png', 1.0);
-    pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+    // 1.0 max quality JPEG to keep file size reasonable while preserving 300DPI quality
+    const imgData = canvas.toDataURL('image/jpeg', 1.0);
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
     
     pdf.save(`PrintReady_${file?.name.split('.')[0] || 'arte'}_A4.pdf`);
     

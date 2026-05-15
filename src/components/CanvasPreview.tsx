@@ -23,9 +23,8 @@ export default function CanvasPreview({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dominantColor, setDominantColor] = useState('#ffffff');
 
-  // Multiplier from mm to pixels at 72 DPI (for preview)
-  // For export we will use 300 DPI
-  const MM_TO_PX = 3.78; 
+  // Multiplier from mm to pixels at 300 DPI (for high quality export)
+  const MM_TO_PX = 11.811; 
 
   useEffect(() => {
     if (image) {
@@ -117,7 +116,8 @@ export default function CanvasPreview({
       ctx.fillStyle = dominantColor;
       ctx.fillRect(bleedRect.x, bleedRect.y, bleedRect.w, bleedRect.h);
     } else if (bleedType === 'blur') {
-      ctx.filter = 'blur(10px)';
+      const blurAmount = 3 * MM_TO_PX; // dynamic blur taking into account resolution
+      ctx.filter = `blur(${blurAmount}px)`;
       ctx.drawImage(img, bleedRect.x, bleedRect.y, bleedRect.w, bleedRect.h);
       ctx.filter = 'none';
       // Fill gap if any
@@ -137,11 +137,11 @@ export default function CanvasPreview({
 
     // 3. Draw Crop Marks (Corner marks)
     if (showCutMarks) {
-      const markLen = 20; // Length of crop marks
-      const offset = 5;   // Offset from the trim line
+      const markLen = 5 * MM_TO_PX; // 5mm Length of crop marks
+      const offset = 2 * MM_TO_PX;   // 2mm Offset from the trim line
       
       ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 0.5;
+      ctx.lineWidth = 1 * (MM_TO_PX / 3.78);
       ctx.setLineDash([]);
 
       // Top Left
